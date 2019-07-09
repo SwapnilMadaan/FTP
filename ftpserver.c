@@ -20,8 +20,13 @@ int main(int argc,char *argv[])
   
   struct stat st = {0};  // for mkdir
   int sock1, sock2;
-  char buf[100], command[5], filename[20];
-  int k, i, size, len, c;
+  char buf[100], command[4], filename[20]; //changed
+  char username[20];
+	char password[20];
+	char firstname[20];
+	char pass[20];
+  char string_0[256];
+  int k, i, size, len, c,loggedin=0;
   int filehandle;
   sock1 = socket(AF_INET, SOCK_STREAM, 0);
   if(sock1 == -1)
@@ -52,8 +57,72 @@ int main(int argc,char *argv[])
       recv(sock2, buf, 100, 0);
       sscanf(buf, "%s", command);
       printf("command recieved %s \n",command);
-      if(!strcmp(command, "ls"))
+  if(!strcmp(command, "USER"))
+ {   c=0;
+	  FILE *filePointer ; 
+    filePointer= fopen("confidential.txt", "r+");
+		sscanf(buf+5,"%s",username);
+   	while((fgets(string_0,256,filePointer)) != NULL) {
+
+  //scans the line then sets 1st and 2nd word to those variables
+  sscanf(string_0,"%s",firstname);
+
+  if(strcmp(firstname,username)==0){
+			c = 331;
+    printf("A match has been found");
+  }
+	else {c=332;}
+}
+		fclose(filePointer);
+	
+     send(sock2, &c, sizeof(int), 0);
+
+
+ }
+    else   if(!strcmp(command, "PASS"))
+ {   c=0;
+	  FILE *filePointer ; 
+    filePointer= fopen("confidential.txt", "r+");
+		sscanf(buf+5,"%s",password);
+   	while((fgets(string_0,256,filePointer)) != NULL) {
+
+  //scans the line then sets 1st and 2nd word to those variables
+  sscanf(string_0,"%s %s",firstname,pass);
+
+  if(strcmp(firstname,username)==0 && strcmp(pass,password)==0){
+			c = 331;
+			loggedin=1;
+    printf("A match has been found");
+  }
+}
+		fclose(filePointer);
+	
+     send(sock2, &c, sizeof(int), 0);
+
+
+ }
+    else 
+ if(!strcmp(command, "CRET"))
+ {   
+	 
+	  FILE *filePointer ; 
+    filePointer= fopen("confidential.txt", "a");
+   	fputs(buf+5,filePointer);
+		fputs("\n",filePointer);
+		fclose(filePointer);
+		   
+		c = 1;
+	
+     send(sock2, &c, sizeof(int), 0);
+	 
+
+ }
+    else  if(!strcmp(command, "LIST"))
 	{
+		if(!loggedin)
+	 { c=530;
+		 send(sock2, &c, sizeof(int), 0);}
+	 else{
 	  system("ls >temps.txt");
 	  i = 0;
 	  stat("temps.txt",&obj);
@@ -61,10 +130,15 @@ int main(int argc,char *argv[])
 	  send(sock2, &size, sizeof(int),0);
 	  filehandle = open("temps.txt", O_RDONLY);
 	  sendfile(sock2,filehandle,NULL,size);
+	 }
 	}
-      else if(!strcmp(command,"get"))
-	{
+      else if(!strcmp(command,"RETR"))
+	{ if(!loggedin)
+	 { c=530;
+		 send(sock2, &c, sizeof(int), 0);}
+	 else{ 
 	  sscanf(buf, "%s%s", filename, filename);
+		printf("filename : %s",filename);
 	  stat(filename, &obj);
 	  filehandle = open(filename, O_RDONLY);
 	  size = obj.st_size;
@@ -73,10 +147,13 @@ int main(int argc,char *argv[])
 	  send(sock2, &size, sizeof(int), 0);
 	  if(size)
 	  sendfile(sock2, filehandle, NULL, size);
-      
+	 }  
 	}
-      else if(!strcmp(command, "put"))
-        {
+      else if(!strcmp(command, "STOR"))
+        { if(!loggedin)
+	 { c=530;
+		 send(sock2, &c, sizeof(int), 0);}
+	 else{
 	  int c = 0, len;
 	  char *f;
 	  sscanf(buf+strlen(command), "%s", filename);
@@ -97,9 +174,14 @@ int main(int argc,char *argv[])
 	  c = write(filehandle, f, size);
 	  close(filehandle);
 	  send(sock2, &c, sizeof(int), 0);
+	 }
         }
-      else if(!strcmp(command, "pwd"))
-	{
+      else if(!strcmp(command, "PWD"))
+
+	{  if(!loggedin)
+	 { c=530;
+		 send(sock2, &c, sizeof(int), 0);}
+	 else{
 	  system("pwd>temp.txt");
 	  i = 0;
           FILE*f = fopen("temp.txt","r");
@@ -107,66 +189,82 @@ int main(int argc,char *argv[])
             buf[i++] = fgetc(f);
           buf[i-1] = '\0';
 	  fclose(f);
-          send(sock2, buf, 100, 0);
+          send(sock2, buf, 100, 0); 
+	 }
 	}
-      else if(!strcmp(command, "cd"))
-        { printf("executing command cd \n ");
+      else if(!strcmp(command, "CWD"))
+        { 
+					if(!loggedin)
+	 { c=530;
+		 send(sock2, &c, sizeof(int), 0);}
+	 else{
+					printf("executing command cd \n ");
           
-          if(chdir(buf+3) == 0)
+          if(chdir(buf+4) == 0)
 	    c = 1;
 	  else
 	    c = 0;
           send(sock2, &c, sizeof(int), 0);
          printf("\ncd executed");
+	 }
         }
       
       //user , pass , mkd ,rmd , abor 
 
-     else if(!strcmp(command, "mkdir"))
-	{
-	  //system("mkd > temps.txt");
-	  //i = 0;
-	  //stat("temps.txt",&obj);
-	  //if (stat(buf, &st) == -1) {
-           //mkdir(buf+3, 0700);
-           //}			
-	  //size = obj.st_size;
-	  //send(sock2, &size, sizeof(int),0);
-	  //filehandle = open("temps.txt", O_RDONLY);
-	  //sendfile(sock2,filehandle,NULL,size);
+     else if(!strcmp(command, "MKD"))
+	{ if(!loggedin)
+	 { c=530;
+		 send(sock2, &c, sizeof(int), 0);}
+	 else{
+	  
 	  printf("executing command mkdir \n ");
           
-          if(mkdir(buf+6, 0700) == 0)
+          if(mkdir(buf+4, 0700) == 0)
 	    c = 1;
 	  else
 	    c = 0;
           send(sock2, &c, sizeof(int), 0);	
 		
-
+	 }
 	}
-        else if(!strcmp(command, "rmdir"))
-	{
+        else if(!strcmp(command, "RMD"))
+	{  if(!loggedin)
+	 { c=530;
+		 send(sock2, &c, sizeof(int), 0);}
+	 else{
 	  printf("executing command rmdir \n ");
           
-          if(rmdir(buf+6) == 0)
+          if(rmdir(buf+4) == 0)
 	    c = 1;
 	  else
 	    c = 0;
           send(sock2, &c, sizeof(int), 0);	
 		
-
+	 }
 	}
 
 
-      
+      else if(!strcmp(command, "ABOR"))
+	{
 
-      else if(!strcmp(command, "bye") || !strcmp(command, "quit"))
+		loggedin = 0;
+
+	  i = 1;
+	  send(sock2, &i, sizeof(int), 0);
+	  
+	}
+	      else if(!strcmp(command, "bye") || !strcmp(command, "QUIT"))
 	{
 	  printf("FTP server quitting..\n");
 	  i = 1;
 	  send(sock2, &i, sizeof(int), 0);
 	  exit(0);
 	}
+	else {
+		char *msg="NO SUCH COMMAND SERV";
+		 send(sock2, &msg, sizeof(int), 0);
+	}
+	 
     }
   return 0;
 }
