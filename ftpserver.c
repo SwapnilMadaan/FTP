@@ -22,9 +22,9 @@ int main(int argc,char *argv[])
   int sock1, sock2;
   char buf[100], command[4], filename[20]; //changed
   char username[20];
-	char password[20];
-	char firstname[20];
-	char pass[20];
+  char password[20];
+  char firstname[20];
+  char pass[20];
   char string_0[256];
   int k, i, size, len, c,loggedin=0;
   int filehandle;
